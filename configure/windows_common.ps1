@@ -38,7 +38,7 @@ Write-Host "GYP_MSVS_OVERRIDE_PATH:"$cl_path
 Start-Sleep -s 2
 
 # configure
-cmake -G "$generator" -DLIB_EAY_RELEASE_DLL:FILEPATH="C:\OpenSSL-Win64\bin\libeay32MD.dll" -DSSL_EAY_RELEASE_DLL:FILEPATH="C:\OpenSSL-Win64\bin\ssleay32MD.dll" -DCMAKE_BUILD_TYPE="$config" -DSKIP_PACKAGING="$skip_packaging" "$arango_source" $Args
+cmake -G "$generator" -DCMAKE_BUILD_TYPE="$config" -DSKIP_PACKAGING="$skip_packaging" -DOPENSSL_ROOT_DIR="C:\OpenSSL-Win64" $Args "$arango_source"
 
 # build - with msbuild
 if ($build) {
