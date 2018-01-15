@@ -25,50 +25,58 @@
 
 #include "Basics/Common.h"
 
+#include <boost/any.hpp>
+
 namespace arangodb {
 class Result {
  public:
-  Result() : _errorNumber(TRI_ERROR_NO_ERROR) {}
+  Result() : _errorNumber{TRI_ERROR_NO_ERROR}, _errorMessage{}, _value{} {}
 
   Result(int errorNumber)
-      : _errorNumber(errorNumber){
-    if (errorNumber != TRI_ERROR_NO_ERROR) {
-      _errorMessage = TRI_errno_string(errorNumber);
-    }
-  }
+      : _errorNumber{errorNumber},
+        _errorMessage{(TRI_ERROR_NO_ERROR == _errorNumber)
+                          ? ""
+                          : TRI_errno_string(errorNumber)},
+        _value{} {}
 
   Result(int errorNumber, std::string const& errorMessage)
-      : _errorNumber(errorNumber), _errorMessage(errorMessage) {}
+      : _errorNumber{errorNumber}, _errorMessage{errorMessage}, _value{} {}
 
   Result(int errorNumber, std::string&& errorMessage)
-      : _errorNumber(errorNumber), _errorMessage(std::move(errorMessage)) {}
-  
+      : _errorNumber{errorNumber},
+        _errorMessage{std::move(errorMessage)},
+        _value{} {}
+
   // copy
-  Result(Result const& other) 
-      : _errorNumber(other._errorNumber), 
-        _errorMessage(other._errorMessage) {}
+  Result(Result const& other)
+      : _errorNumber{other._errorNumber},
+        _errorMessage{other._errorMessage},
+        _value{other._value} {}
 
   Result& operator=(Result const& other) {
     _errorNumber = other._errorNumber;
     _errorMessage = other._errorMessage;
-    return *this; 
+    _value = other._value;
+    return *this;
   }
- 
-  // move 
-  Result(Result&& other) noexcept 
-      : _errorNumber(other._errorNumber), 
-        _errorMessage(std::move(other._errorMessage)) {}
-  
+
+  // move
+  Result(Result&& other) noexcept
+      : _errorNumber{other._errorNumber},
+        _errorMessage{std::move(other._errorMessage)},
+        _value{std::move(other._value)} {}
+
   Result& operator=(Result&& other) noexcept {
     _errorNumber = other._errorNumber;
     _errorMessage = std::move(other._errorMessage);
-    return *this; 
+    _value = std::move(other._value);
+    return *this;
   }
 
   virtual ~Result() {}
 
  public:
-  bool ok()   const { return _errorNumber == TRI_ERROR_NO_ERROR; }
+  bool ok() const { return _errorNumber == TRI_ERROR_NO_ERROR; }
   bool fail() const { return !ok(); }
 
   int errorNumber() const { return _errorNumber; }
@@ -83,30 +91,37 @@ class Result {
     } else {
       _errorMessage.clear();
     }
+
+    _value = boost::any();
+
     return *this;
   }
 
   Result& reset(int errorNumber, std::string const& errorMessage) {
     _errorNumber = errorNumber;
     _errorMessage = errorMessage;
+    _value = boost::any();
     return *this;
   }
 
   Result& reset(int errorNumber, std::string&& errorMessage) noexcept {
     _errorNumber = errorNumber;
     _errorMessage = std::move(errorMessage);
+    _value = boost::any();
     return *this;
   }
 
   Result& reset(Result const& other) {
     _errorNumber = other._errorNumber;
     _errorMessage = other._errorMessage;
+    _value = other._value;
     return *this;
   }
 
   Result& reset(Result&& other) noexcept {
     _errorNumber = other._errorNumber;
     _errorMessage = std::move(other._errorMessage);
+    _value = std::move(other._value);
     return *this;
   }
 
@@ -116,10 +131,31 @@ class Result {
   virtual std::string errorMessage() const& { return _errorMessage; }
   virtual std::string errorMessage() && { return std::move(_errorMessage); }
 
+  template <typename T>
+  bool hasValue() const noexcept {
+    return !_value.empty() && (typeid(T) != _value.type());
+  }
+
+  template <typename T>
+  T value() const noexcept(hasValue<T>()) {
+    return boost::any_cast<T>(_value);
+  }
+
+  template <typename T>
+  T const& value() const noexcept(hasValue<T>()) {
+    return boost::any_cast<T const&>(_value);
+  }
+
+  template <typename T>
+  T&& value() const noexcept(hasValue<T>()) {
+    return boost::any_cast<T&&>(std::move(_value));
+  }
+
  protected:
   int _errorNumber;
   std::string _errorMessage;
+  boost::any _value;
 };
-}
+}  // namespace arangodb
 
 #endif
